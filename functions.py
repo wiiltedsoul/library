@@ -201,9 +201,8 @@ def update_book():
 
 def find_book_update():
 # Prompts user for book details and returns the Book object if found, else None
-    search_title = input("Enter the title of the book you want to update: ")
-    search_author = input("Enter the author of the book you want to update: ")
-
+    search_title = input("Enter the title of the book you're looking for: ")
+    search_author = input("Enter the author of the book you're looking for: ")
     found_book = None # Initialize to None
 
     # Search in bookshelf
@@ -301,3 +300,31 @@ def searching():
     # Add an else block for invalid user_choice, just like in previous examples
     else:
         print("Invalid search type. Please choose 'trope' or 'book'.")
+
+def delete():
+    book_to_delete = find_book_update() # Renamed to match your helper function and be clearer
+
+    if book_to_delete is None: # If the book wasn't found by the helper, just exit
+        return
+
+    delete_confirm = input(f"Is '{book_to_delete.title}' by {book_to_delete.author} the book you're trying to delete? (Y/N)\n").lower() # Fixed f-string and added newline
+
+    if delete_confirm == "y":
+        # Check which list it's in and remove it
+        if book_to_delete in bookshelf:
+            bookshelf.remove(book_to_delete)
+            print(f"Awh, sad to see '{book_to_delete.title}' go! It has been removed from your bookshelf.\n")
+        elif book_to_delete in to_be_read: # Use elif to ensure only one list is checked if it's found in the first
+            to_be_read.remove(book_to_delete)
+            print(f"Awh, sad to see '{book_to_delete.title}' go! It has been removed from your to-be-read shelf.\n")
+        else:
+            # This 'else' should theoretically not be hit if find_book_for_update works,
+            # but it's good for robustness.
+            print(f"Error: '{book_to_delete.title}' not found in either list, despite initial search.")
+            return # Exit if somehow not found
+
+        save_data() # Save ONLY if a deletion actually occurred and was confirmed
+    else:
+        print("Oop, gotchya. See ya later!")
+        return
+    save_data()
