@@ -1,6 +1,7 @@
 # main.py (or library.py)
 # Import functions from your functions file
 from functions import add_new_book, view_bookshelf # and other functions like update_book_status, etc.
+from storage import save_data, load_data
 
 def display_menu():
     print("--- Library Menu ---\n")
@@ -12,7 +13,9 @@ def display_menu():
     print("6. Exit program")
     print("--------------------------")
 
+
 def library_lobby():
+    load_data()
     while True:
         display_menu()
         choice = input("Enter your choice (1-6): ")
@@ -32,6 +35,7 @@ def library_lobby():
             print("You chose to search for a book!")
             # search_book() # Uncomment when implemented
         elif choice == '6':
+            save_data()
             print("Farewell, mighty librarian! May your reading adventures be grand!")
             break
         else:

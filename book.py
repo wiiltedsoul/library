@@ -5,3 +5,12 @@ class Book:
         self.rating = rating
         self.tropes = tropes if tropes is not None else []
         self.status = status
+    
+    def to_dict(self):
+        return {
+            "title": self.title,
+            "author": self.author,
+            "rating": self.rating,
+            "tropes": self.tropes,
+            "status": self.status
+        }
