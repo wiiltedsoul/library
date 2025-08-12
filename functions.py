@@ -1,9 +1,9 @@
 from book import Book
-from data import bookshelves, to_be_read
+from data import bookshelf, to_be_read
 
 def book_exists(title, author):
     # Checks if a book with the given title and author already exists in either list
-    for book in bookshelves:
+    for book in bookshelf:
         if book.title.lower() == title.lower() and book.author.lower() == author.lower():
             return True
     for book in to_be_read:
@@ -36,7 +36,7 @@ def add_new_book():
             except ValueError:
                 print("Invalid input. Please enter a number.")
         new_book = Book(book_title, book_author, rating=book_rating, tropes=book_tropes_list, status=stat)
-        bookshelves.append(new_book)
+        bookshelf.append(new_book)
         print(f"'{book_title}' by {book_author} has been added to your bookshelves with a rating of {book_rating} stars!")
     else:
         stat = "tbr"
@@ -44,3 +44,19 @@ def add_new_book():
         to_be_read.append(new_book)
         print(f"'{book_title}' by {book_author} has been added to your to-be-read shelf!")
 
+def view_bookshelf():
+    if not bookshelf:
+        print("\nYour Bookshelves are looking a bit dusty... Time to read some more!")
+        return
+    
+    print("\n--- Your Bookshelf ---")
+    for book in bookshelf:
+        print(f"{book.title} by {book.author}")
+        if book.rating is not None:
+            print(f"Rating: {book.rating} / 5")
+        
+        if book.tropes:
+            print(f"Tropes: {', '.join(book.tropes)}")
+        else:
+            print("You haven't listed any tropes for this book :(")
+        print("--------------------")

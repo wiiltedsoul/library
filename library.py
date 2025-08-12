@@ -1,6 +1,6 @@
 # main.py (or library.py)
 # Import functions from your functions file
-from functions import add_new_book # and other functions like update_book_status, etc.
+from functions import add_new_book, view_bookshelf # and other functions like update_book_status, etc.
 
 def display_menu():
     print("--- Library Menu ---\n")
@@ -27,7 +27,7 @@ def library_lobby():
             # view_tbr_shelf() # Uncomment when implemented
         elif choice == '4':
             print("You chose to view your Bookshelf!")
-            # view_bookshelf() # Uncomment when implemented
+            view_bookshelf()
         elif choice == '5':
             print("You chose to search for a book!")
             # search_book() # Uncomment when implemented
