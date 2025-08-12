@@ -19,13 +19,41 @@ def add_new_book():
     if book_exists(book_title, book_author):
         print(f"Error: '{book_title}' by {book_author} already exists in your library!\n")
         return
-    book_tropes_string = input("What are the tropes? (each new trope separated by '|' with no spaces)")
-    book_tropes_list = [trope.strip() for trope in book_tropes_string.split('|')] # Added .strip() to clean spaces
-    book_status = input("Have you read this? (Y/N)\n").lower() # Added .lower() here for consistency
+
+    # --- INPUT VALIDATION FOR LENGTH ---
+    book_length = None
+    book_len_unit = None
+
+    while True: # Loop for length value
+        try:
+            book_length_str = input("How many pages/hours is this book? (e.g., 300 or 10.5)\n")
+            book_length = float(book_length_str)
+            if book_length > 0: # Ensure length is positive
+                break
+            else:
+                print("Length must be a positive number.\n")
+        except ValueError:
+            print("Invalid input. Please enter a number for length.\n")
+
+    while True: # Loop for length unit
+        book_len_unit = input("Are we tracking this book in hrs or pgs? (hrs/pgs)\n").lower()
+        if book_len_unit in ["hrs", "pgs"]:
+            break
+        else:
+            print("Invalid unit. Please enter 'hrs' or 'pgs'.\n")
+    # --- END INPUT VALIDATION FOR LENGTH ---
+
+    book_tropes_string = input("What are the tropes? (each new trope separated by '|' with no spaces)\n")
+    book_tropes_list = [trope.strip() for trope in book_tropes_string.split('|') if trope.strip()]
+    book_status = input("Have you read this book? (Y/N)\n").lower()
+
+    # Initialize rating and platform to None
+    book_rating = None
+    book_platform = None
 
     if book_status == "y":
         stat = "read"
-        while True:
+        while True: # Loop for rating
             try:
                 book_rating_str = input("Wonderful! How would you rate that adventure? (On a scale of 1-5)\n")
                 book_rating = float(book_rating_str)
@@ -35,15 +63,31 @@ def add_new_book():
                     print("Please enter a rating between 1 and 5.\n")
             except ValueError:
                 print("Invalid input. Please enter a number.\n")
-        new_book = Book(book_title, book_author, rating=book_rating, tropes=book_tropes_list, status=stat)
-        bookshelf.append(new_book)
-        print(f"'{book_title}' by {book_author} has been added to your bookshelves with a rating of {book_rating} stars!\n")
-    else:
+    else: # if book_status == "n" (tbr)
         stat = "tbr"
-        book_platform = input("Where can you read this book?\n")
-        new_book = Book(book_title, book_author, tropes=book_tropes_list, status=stat, platform=book_platform)
+        book_platform = input("Where can you read/listen to this book?\n")
+        # No rating for TBR books, so book_rating remains None
+
+    # --- Create the new Book object, passing ALL collected attributes ---
+    new_book = Book(
+        title=book_title,
+        author=book_author,
+        rating=book_rating,
+        tropes=book_tropes_list,
+        status=stat,
+        platform=book_platform,
+        length_value=book_length,
+        length_unit=book_len_unit
+    )
+
+    if stat == "read":
+        bookshelf.append(new_book)
+        print(f"'{book_title}' by {book_author} ({new_book.length_value} {new_book.length_unit}) has been added to your bookshelves with a rating of {new_book.rating} stars!\n")
+    else: # stat == "tbr"
         to_be_read.append(new_book)
-        print(f"'{book_title}' by {book_author} has been added to your to-be-read shelf! Don't forget to read it on {book_platform}!\n")
+        print(f"'{book_title}' by {book_author} ({new_book.length_value} {new_book.length_unit}) has been added to your to-be-read shelf! Don't forget to read it on {new_book.platform}!\n")
+    
+    save_data()
 
 def view_bookshelf():
     if not bookshelf:
@@ -53,9 +97,9 @@ def view_bookshelf():
     print("\n--- Your Bookshelf ---")
     for book in bookshelf:
         print(f"{book.title} by {book.author}")
+        print(f"{book.length_value}{book.length_unit}")
         if book.rating is not None:
             print(f"Rating: {book.rating} / 5")
-        
         if book.tropes:
             print(f"Tropes: {', '.join(book.tropes)}")
         else:
@@ -69,7 +113,8 @@ def view_tbr():
     
     print("\n--- Your TBR Shelf ---")
     for book in to_be_read:
-        print(f"{book.title} by {book.author}. [{book.platform}]")        
+        print(f"{book.title} by {book.author}. [{book.platform}]")
+        print(f"{book.length_value}{book.length_unit}")
         if book.tropes:
             print(f"Tropes: {', '.join(book.tropes)}")
         else:
@@ -244,8 +289,8 @@ def searching():
         if search_results_book:
             print("\n--- Search Results ---")
             for book in search_results_book: # This loop processes EACH found book
-                print(f"Title: {book.title}")
-                print(f"Author: {book.author}")
+                print(f"{book.title} by {book.author}")
+                print(f"{book.length_value}{book.length_unit}")
                 
                 if book.status == "read":
                     if book.rating is not None:
@@ -280,8 +325,8 @@ def searching():
         if matching_books_trope: # This condition now correctly uses 'matching_books_trope'
             print("\n--- Search Results ---")
             for book in matching_books_trope: # This loop processes EACH found book for trope
-                print(f"Title: {book.title}")
-                print(f"Author: {book.author}")
+                print(f"{book.title} by {book.author}")
+                print(f"{book.length_value}{book.length_unit}")
                 
                 if book.status == "read":
                     if book.rating is not None:
@@ -327,4 +372,295 @@ def delete():
     else:
         print("Oop, gotchya. See ya later!")
         return
-    save_data()
+    
+def filter_menu():
+    print("--- Filtering Options ---\n")
+    print("1. By Status")
+    print("2. By Rating")
+    print("3. By Platform")
+    print("4. By Specific Tropes")
+    print("5. Return to main menu")
+    print("--------------------------")
+
+def sorting_menu():
+    print("--- Sorting Options ---\n")
+    print("1. By Title")
+    print("2. By Author")
+    print("3. By Rating")
+    print("4. By Page No.")
+    print("5. Return to main menu")
+    print("--------------------------")
+
+# (Your filter_menu() and sorting_menu() functions would be here in functions.py)
+
+def filter_and_sort_books():
+    # Allows the user to filter or sort their library.
+    while True: # This loop keeps the filter/sort menu active until user exits
+        print("\n--- Filter & Sort Menu ---")
+        print("1. Filter books")
+        print("2. Sort books")
+        print("3. Return to main menu")
+        print("--------------------------")
+
+        main_choice = input("Enter your choice (1-3):\n")
+
+        if main_choice == '1':
+            filter_menu() # Display filtering options
+            filter_choice = input("Enter your filtering preference (1-5):\n") # <--- NOW get the specific choice
+            
+            # --- We'll put the filtering logic here ---
+            if filter_choice == '1':
+                print("You chose to filter by Status!")
+                status_choice = input("Do you want to see books you've read or books on your tbr? (read/tbr)\n").lower() # Clarified prompt
+
+                filtered_books = [] # A new list to collect all books that match the filter
+
+                if status_choice == "read":
+                    for book in bookshelf: # Iterate only bookshelf, since read books are there
+                        if book.status == "read": # Redundant, but ensures correctness if data inconsistencies
+                            filtered_books.append(book)
+                    print(f"\n--- Books Read ({len(filtered_books)}) ---")
+                elif status_choice == "tbr":
+                    for book in to_be_read: # Iterate only tbr, since tbr books are there
+                        if book.status == "tbr": # Redundant, but ensures correctness
+                            filtered_books.append(book)
+                    print(f"\n--- Books To Be Read ({len(filtered_books)}) ---")
+                else:
+                    print("Invalid status choice. Please enter 'read' or 'tbr'.")
+                    continue # Go back to the Filter & Sort main menu
+
+                # --- Display the collected filtered books ---
+                if filtered_books:
+                    for book in filtered_books:
+                        print(f"{book.title} by {book.author}")
+                        print(f"{book.length_value}{book.length_unit}")
+                        if book.status == "read": # Display rating only for read books
+                            if book.rating is not None:
+                                print(f"Rating: {book.rating} / 5")
+                        elif book.status == "tbr": # Display platform only for tbr books
+                            if book.platform is not None:
+                                print(f"Platform: {book.platform}")
+                        
+                        if book.tropes:
+                            print(f"Tropes: {', '.join(book.tropes)}")
+                        else:
+                            print("You haven't listed any tropes for this book :(")
+                        print("--------------------")
+                else:
+                    print("No books found matching this status criteria.\n")
+
+            if filter_choice == '2':
+                print("You chose to filter by Rating!")
+                while True:
+                    try:
+                        minimum = input("What's the minimum rating you want to see?").lower()
+                        min_rating = float(minimum)
+                        if 1 <= min_rating <= 5:
+                            break
+                        else:
+                            print("Please enter a rating between 1 and 5.\n")
+                    except ValueError:
+                        print("Invalid input. Please enter a number.\n")
+                filtered_books = []
+                for book in bookshelf:
+                    if book.rating is not None and book.rating >= min_rating:
+                        filtered_books.append(book)
+                
+                if filtered_books:
+                    for book in filtered_books:
+                        print(f"{book.title} by {book.author}.")
+                        print(f"{book.length_value}{book.length_unit}")
+                        print(f"Rating: {book.rating} / 5")
+                        if book.tropes:
+                            print(f"Tropes: {', '.join(book.tropes)}")
+                        else:
+                            print("You haven't listed any tropes for this book :(")
+                        print("--------------------")
+                else:
+                    print("No books found matching this rating criteria.\n")
+
+            elif main_choice == '3': 
+                print("You chose to filter by Platform!")
+                platform_query = input("What platform are you looking for?\nPhysical, Kindle, Kobo, Audible, Google or BookFunnel").lower()
+                filtered_books = [] # This list will hold books matching the platform
+                for book in to_be_read:
+                    if book.platform is not None and book.platform.lower() == platform_query:
+                        filtered_books.append(book)
+                if filtered_books:
+                    for book in filtered_books:
+                        print(f"{book.title} by {book.author}. [{book.platform}]")
+                        print(f"{book.length_value}{book.length_unit}")
+                        if book.tropes:
+                            print(f"Tropes: {', '.join(book.tropes)}")
+                        else:
+                            print("You haven't listed any tropes for this book :(")
+                        print("--------------------")
+                else:
+                    print("No books found matching this platform criteria.\n")
+
+            elif filter_choice == '4':
+                print("You chose to filter by Specific Tropes!")
+                trope_query = input("What specific trope are you looking for?\n").lower()
+
+                all_books = bookshelf + to_be_read
+                filtered_books = []
+                for book in all_books:
+                    for trope_item in book.tropes:
+                        if trope_item.lower() == trope_query:
+                            filtered_books.append(book)
+                            break # Found the trope in this book, move to the next book
+                print(f"\n--- Found {len(filtered_books)} matching books with the trope '{trope_query}' ---") # Added newlines for better spacing
+                    
+                if filtered_books:
+                    print("\n--- Search Results ---") # Added newline for consistency
+                    for book in filtered_books:
+                        print(f"{book.title} by {book.author}.")
+                        if book.status == "read":
+                            if book.rating is not None:
+                                print(f"Rating: {book.rating} / 5")
+                        elif book.status == "tbr":
+                            if book.platform is not None:
+                                print(f"Platform: {book.platform}") # Display platform clearly labeled
+                            # No else needed here, if platform is None, it won't print.
+                            
+                        if book.tropes:
+                            print(f"Tropes: {', '.join(book.tropes)}")
+                        else:
+                            print("You haven't listed any tropes for this book :(")
+                        print("--------------------")
+                else:
+                    print("No books found with that trope.\n") # Added newline for spacing
+
+            elif filter_choice == '5':
+                print("Returning to Filter & Sort main menu.")
+            else:
+                print("Invalid filtering choice. Please enter a number between 1 and 5.\n")
+
+        elif main_choice == '2':
+            sorting_menu() # Display sorting options
+            sort_choice = input("Enter your sorting choice (1-5):\n") # <--- NOW get the specific choice
+
+            # --- We'll put the sorting logic here ---
+            if sort_choice == '1':
+                print("You chose to sort by Title (A-Z)!")
+                all_books = bookshelf + to_be_read
+                sorted_books = sorted(all_books, key=lambda book: book.title.lower())
+                if sorted_books:
+                    print("\n--- Sorted by Title (A-Z) ---")
+                    for book in sorted_books:
+                        print(f"{book.title} by {book.author}")
+                        print(f"{book.length_value}{book.length_unit}")
+                        
+                        if book.status == "read":
+                            if book.rating is not None:
+                                print(f"Rating: {book.rating} / 5")
+                        elif book.status == "tbr":
+                            if book.platform is not None:
+                                print(f"Platform: {book.platform}")
+                        
+                        if book.tropes:
+                            print(f"Tropes: {', '.join(book.tropes)}")
+                        else:
+                            print("You haven't listed any tropes for this book :(")
+                        print("--------------------")
+                else:
+                    print("No books to sort :(\n")
+
+
+            elif sort_choice == '2':
+                print("You chose to sort by Author (A-Z)!")
+
+                all_books = bookshelf + to_be_read
+                sorted_books = sorted(all_books, key=lambda book: book.author.lower())
+                if sorted_books:
+                    print("\n--- Sorted by Author (A-Z) ---")
+                    for book in sorted_books:
+                        print(f"{book.title} by {book.author}")
+                        print(f"{book.length_value}{book.length_unit}")
+                        
+                        if book.status == "read":
+                            if book.rating is not None:
+                                print(f"Rating: {book.rating} / 5")
+                        elif book.status == "tbr":
+                            if book.platform is not None:
+                                print(f"Platform: {book.platform}")
+                        
+                        if book.tropes:
+                            print(f"Tropes: {', '.join(book.tropes)}")
+                        else:
+                            print("You haven't listed any tropes for this book :(")
+                        print("--------------------")
+                else:
+                    print("No books to sort :(\n")
+
+
+            elif sort_choice == '3':
+                print("You chose to sort by Rating (Highest to Lowest)!")
+
+                # Step 1: Filter for books that are "read" and have a rating
+                rated_books = []
+                for book in bookshelf:
+                    if book.rating is not None:
+                        rated_books.append(book)
+                sorted_by_rating = sorted(rated_books, key=lambda book: book.rating, reverse=True)
+                if sorted_by_rating:
+                    print("\n--- Sorted by Rating (Highest to Lowest) ---")
+                    for book in sorted_by_rating:
+                        print(f"{book.title} by {book.author}")
+                        print(f"{book.length_value}{book.length_unit}")
+                        print(f"Rating: {book.rating} / 5")
+                        if book.tropes:
+                            print(f"Tropes: {', '.join(book.tropes)}")
+                        else:
+                            print("You haven't listed any tropes for this book :(")
+                        print("--------------------")
+                else:
+                    print("No books to sort :(\n")
+
+            elif sort_choice == '4':
+                print("You chose to sort by Length (Shortest to Longest)!")
+
+                books_w_length = []
+                all_books_combined = bookshelf + to_be_read # Start with all books
+                for book in all_books_combined:
+                    if book.length_value is not None: # Check if it actually has a length
+                        books_w_length.append(book)
+                sorted_by_length = sorted(books_w_length, key=lambda book: book.length_value)
+                if sorted_by_length:
+                    print("\n--- Sorted by Length (Shortest to Longest) ---")
+                    for book in sorted_by_length:
+                        print(f"{book.title} by {book.author}")
+                        print(f"{book.length_value}{book.length_unit}")
+                        if book.status == "read":
+                            if book.rating is not None:
+                                print(f"Rating: {book.rating} / 5")
+                        elif book.status == "tbr":
+                            if book.platform is not None:
+                                print(f"Platform: {book.platform}")
+                        
+                        if book.tropes:
+                            print(f"Tropes: {', '.join(book.tropes)}")
+                        else:
+                            print("You haven't listed any tropes for this book :(")
+                        print("--------------------")
+                else:
+                    print("No books to sort :(\n")
+                
+                # Step 2: How would you use sorted() to sort 'all_books_with_length' by length_value?
+                # sorted_books_by_length = sorted(all_books_with_length, key=lambda book: ???)
+
+                # Step 3: Then, how would you display the 'sorted_books_by_length' list?
+                # Remember your standard book display format.
+
+
+
+            elif sort_choice == '5':
+                print("Returning to Filter & Sort main menu.")
+            else:
+                print("Invalid sorting choice. Please enter a number between 1 and 5.\n")
+
+        elif main_choice == '3':
+            print("Returning to main menu.")
+            return # Exit this function to go back to library_lobby
+        else:
+            print("Invalid main choice. Please enter 1, 2, or 3.\n")
