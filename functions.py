@@ -1,5 +1,5 @@
 from book import Book
-from data import bookshelf, to_be_read
+from data import bookshelf, to_be_read, dnf_books
 from storage import save_data
 
 def book_exists(title, author):
@@ -19,56 +19,63 @@ def add_new_book():
     if book_exists(book_title, book_author):
         print(f"Error: '{book_title}' by {book_author} already exists in your library!\n")
         return
-
-    # --- INPUT VALIDATION FOR LENGTH ---
+    
     book_length = None
     book_len_unit = None
 
-    while True: # Loop for length value
+    while True:
         try:
             book_length_str = input("How many pages/hours is this book? (e.g., 300 or 10.5)\n")
             book_length = float(book_length_str)
-            if book_length > 0: # Ensure length is positive
+            if book_length > 0:
                 break
             else:
                 print("Length must be a positive number.\n")
         except ValueError:
             print("Invalid input. Please enter a number for length.\n")
 
-    while True: # Loop for length unit
+    while True:
         book_len_unit = input("Are we tracking this book in hrs or pgs? (hrs/pgs)\n").lower()
         if book_len_unit in ["hrs", "pgs"]:
             break
         else:
             print("Invalid unit. Please enter 'hrs' or 'pgs'.\n")
-    # --- END INPUT VALIDATION FOR LENGTH ---
 
     book_tropes_string = input("What are the tropes? (each new trope separated by '|' with no spaces)\n")
     book_tropes_list = [trope.strip() for trope in book_tropes_string.split('|') if trope.strip()]
-    book_status = input("Have you read this book? (Y/N)\n").lower()
-
-    # Initialize rating and platform to None
+    
+    # --- Start of refactored status input and attribute assignment ---
     book_rating = None
     book_platform = None
+    dnf_reason = None # Initialized here!
 
-    if book_status == "y":
-        stat = "read"
-        while True: # Loop for rating
-            try:
-                book_rating_str = input("Wonderful! How would you rate that adventure? (On a scale of 1-5)\n")
-                book_rating = float(book_rating_str)
-                if 1 <= book_rating <= 5:
-                    break
-                else:
-                    print("Please enter a rating between 1 and 5.\n")
-            except ValueError:
-                print("Invalid input. Please enter a number.\n")
-    else: # if book_status == "n" (tbr)
-        stat = "tbr"
-        book_platform = input("Where can you read/listen to this book?\n")
-        # No rating for TBR books, so book_rating remains None
+    while True: # Loop to ensure valid status input
+        book_status_input = input("Have you read this book, or did not finish it? (Y/N/DNF)\n").lower()
+        if book_status_input == "y":
+            stat = "read"
+            while True:
+                try:
+                    book_rating_str = input("Wonderful! How would you rate that adventure? (On a scale of 1-5)\n")
+                    book_rating = float(book_rating_str)
+                    if 1 <= book_rating <= 5:
+                        break
+                    else:
+                        print("Please enter a rating between 1 and 5.\n")
+                except ValueError:
+                    print("Invalid input. Please enter a number.\n")
+            break # Break out of the status input loop
+        elif book_status_input == "n":
+            stat = "tbr"
+            book_platform = input("Where can you read/listen to this book?\n")
+            break # Break out of the status input loop
+        elif book_status_input == "dnf":
+            stat = "dnf"
+            dnf_reason = input("Oof. Sorry about that. Why'd you DNF?\n") # Assigns to initialized variable
+            break # Break out of the status input loop
+        else:
+            print("Invalid status. Please enter 'Y', 'N', or 'DNF'.\n")
+    # --- End of refactored status input and attribute assignment ---
 
-    # --- Create the new Book object, passing ALL collected attributes ---
     new_book = Book(
         title=book_title,
         author=book_author,
@@ -77,15 +84,20 @@ def add_new_book():
         status=stat,
         platform=book_platform,
         length_value=book_length,
-        length_unit=book_len_unit
+        length_unit=book_len_unit,
+        dnf_reason=dnf_reason # Now dnf_reason is always defined
     )
 
+    # --- Refactored final appending logic ---
     if stat == "read":
         bookshelf.append(new_book)
         print(f"'{book_title}' by {book_author} ({new_book.length_value} {new_book.length_unit}) has been added to your bookshelves with a rating of {new_book.rating} stars!\n")
-    else: # stat == "tbr"
+    elif stat == "tbr":
         to_be_read.append(new_book)
         print(f"'{book_title}' by {book_author} ({new_book.length_value} {new_book.length_unit}) has been added to your to-be-read shelf! Don't forget to read it on {new_book.platform}!\n")
+    elif stat == "dnf":
+        dnf_books.append(new_book)
+        print(f"'{book_title}' by {book_author} has been added to your DNF list because: {new_book.dnf_reason}!\n") # Added dnf_reason to print
     
     save_data()
 
@@ -119,6 +131,22 @@ def view_tbr():
             print(f"Tropes: {', '.join(book.tropes)}")
         else:
             print("You haven't listed any tropes for this book :(")
+        print("--------------------")
+
+def view_dnf():
+    if not dnf_books:
+        print("\nYour DNF is empty! Wow you must be great at picking books!")
+        return
+    
+    print("\n--- DNF Trashcan ---")
+    for book in dnf_books:
+        print(f"{book.title} by {book.author}")
+        print(f"{book.length_value}{book.length_unit}")
+        if book.tropes:
+            print(f"Tropes: {', '.join(book.tropes)}")
+        else:
+            print("You haven't listed any tropes for this book :(")
+        print(f"Reason for  DNF: {book.dnf_reason}")
         print("--------------------")
 
 def update_book():
@@ -184,47 +212,114 @@ def update_book():
 
     # change shelf
     elif update_choice == '5':
-        # Scenario 1: Book is currently on the To Be Read shelf (moving to Read)
-        if book_to_update.status == "tbr": # More robust check for current status
-            print("OOO A new book under your belt!? Nice!\n")
-            # Remove from TBR and add to Bookshelf
-            to_be_read.remove(book_to_update) # Remove from its old list
-            bookshelf.append(book_to_update)  # Add to its new list
-            book_to_update.status = "read"    # Update the book's status attribute
-            print(f"Awesome! I've moved '{book_to_update.title}' by {book_to_update.author} over to your bookshelf!")
-            # Prompt for rating (your existing robust code)
-            while True:
-                try:
-                    new_rating_str = input("Let's rate it! How'd you like this new adventure? (On a scale of 1-5)\n")
-                    new_rating = float(new_rating_str)
-                    if 1 <= new_rating <= 5:
-                        break
-                    else:
-                        print("Please enter a rating between 1 and 5.\n")
-                except ValueError:
-                    print("Invalid input. Please enter a number.\n")
-            book_to_update.rating = new_rating # Assign the valid rating
-            print(f"I set the rating of '{book_to_update.title}' to {book_to_update.rating} stars!")
-
-        # Scenario 2: Book is currently on the Bookshelf (moving to To Be Read)
-        elif book_to_update.status == "read": # Check if it's currently read
-            to_tbr_confirm = input(f"Oop, you said you already read {book_to_update.title}... do you need to fix this? (Y/N)").lower()
-            # if yes
-            if to_tbr_confirm == "y":
-                # Remove from Bookshelf and add to TBR
-                bookshelf.remove(book_to_update) # Remove from its old list
-                to_be_read.append(book_to_update)  # Add to its new list
-                book_to_update.status = "tbr"     # Update the book's status attribute
-                book_to_update.rating = None      # Clear the rating
-                new_plat_ask = input("Oh! Now that it's on your tbr did you want to set what platform it's available on? (Y/N)").lower()
-                if new_plat_ask == "y":
-                    new_plat = input("Awesome, where can it be read?")
-                    book_to_update.platform = new_plat
-                    print(f"Awesome! So not only did I move {book_to_update.title} over to your tbr, I also added {book_to_update.platform} as the available platform!\n")
+        print(f"Current status of '{book_to_update.title}': {book_to_update.status}")
+        
+        new_status_input = None
+        while True:
+            new_status_input = input("Change status to (read/tbr/dnf):\n").lower()
+            if new_status_input in ["read", "tbr", "dnf"]:
+                break
             else:
-                print("Oop, gotchya. See ya later!")
-                return
-        save_data()
+                print("Invalid status. Please enter 'read', 'tbr', or 'dnf'.\n")
+        
+        # If the new status is the same as the current status, do nothing
+        if new_status_input == book_to_update.status:
+            print(f"'{book_to_update.title}' is already marked as '{new_status_input}'. No change made.\n")
+            save_data() # Save just in case (though no change, good for consistency)
+            return
+
+        # --- Handle transitions FROM current status ---
+
+        # Scenario A: Book is currently READ
+        if book_to_update.status == "read":
+            bookshelf.remove(book_to_update) # Always remove from current list first
+
+            if new_status_input == "tbr":
+                to_be_read.append(book_to_update)
+                book_to_update.status = "tbr"
+                book_to_update.rating = None
+                # Optional: Ask for platform when moving from read to tbr
+                platform_ask = input("Would you like to add a platform for this book now? (Y/N)\n").lower()
+                if platform_ask == "y":
+                    book_to_update.platform = input("Where can you read this book?\n")
+                else:
+                    book_to_update.platform = None # Clear platform if not provided
+                book_to_update.dnf_reason = None # Clear DNF reason
+                print(f"'{book_to_update.title}' moved to To Be Read shelf.\n")
+            elif new_status_input == "dnf":
+                dnf_books.append(book_to_update)
+                book_to_update.status = "dnf"
+                book_to_update.rating = None
+                book_to_update.platform = None
+                book_to_update.dnf_reason = input("Why did you DNF this book?\n")
+                print(f"'{book_to_update.title}' moved to DNF list.\n")
+
+        # Scenario B: Book is currently TBR
+        elif book_to_update.status == "tbr":
+            to_be_read.remove(book_to_update) # Always remove from current list first
+
+            if new_status_input == "read":
+                bookshelf.append(book_to_update)
+                book_to_update.status = "read"
+                book_to_update.platform = None # Clear platform from TBR
+                # Prompt for rating (your existing robust code)
+                while True:
+                    try:
+                        new_rating_str = input("Enter new rating (1-5):\n")
+                        new_rating = float(new_rating_str)
+                        if 1 <= new_rating <= 5:
+                            book_to_update.rating = new_rating
+                            break
+                        else:
+                            print("Please enter a rating between 1 and 5.\n")
+                    except ValueError:
+                        print("Invalid input. Please enter a number.\n")
+                book_to_update.dnf_reason = None # Clear DNF reason
+                print(f"'{book_to_update.title}' moved to Bookshelf.\n")
+            elif new_status_input == "dnf":
+                dnf_books.append(book_to_update)
+                book_to_update.status = "dnf"
+                book_to_update.rating = None
+                book_to_update.platform = None # Clear platform from TBR
+                book_to_update.dnf_reason = input("Why did you DNF this book?\n")
+                print(f"'{book_to_update.title}' moved to DNF list.\n")
+        
+        # Scenario C: Book is currently DNF
+        elif book_to_update.status == "dnf":
+            dnf_books.remove(book_to_update) # Always remove from current list first
+
+            if new_status_input == "read":
+                bookshelf.append(book_to_update)
+                book_to_update.status = "read"
+                book_to_update.platform = None # Clear platform from DNF
+                book_to_update.dnf_reason = None # Clear DNF reason
+                # Prompt for rating
+                while True:
+                    try:
+                        new_rating_str = input("Enter new rating (1-5):\n")
+                        new_rating = float(new_rating_str)
+                        if 1 <= new_rating <= 5:
+                            book_to_update.rating = new_rating
+                            break
+                        else:
+                            print("Please enter a rating between 1 and 5.\n")
+                    except ValueError:
+                        print("Invalid input. Please enter a number.\n")
+                print(f"'{book_to_update.title}' moved to Bookshelf.\n")
+            elif new_status_input == "tbr":
+                to_be_read.append(book_to_update)
+                book_to_update.status = "tbr"
+                book_to_update.rating = None # Clear rating from DNF
+                book_to_update.dnf_reason = None # Clear DNF reason
+                # Optional: Ask for platform
+                platform_ask = input("Would you like to add a platform for this book now? (Y/N)\n").lower()
+                if platform_ask == "y":
+                    book_to_update.platform = input("Where can you read this book?\n")
+                else:
+                    book_to_update.platform = None # Clear platform if not provided
+                print(f"'{book_to_update.title}' moved to To Be Read shelf.\n")
+        
+        save_data() # Save data after the transition is complete
 
     # update plaform
     elif update_choice == '6':

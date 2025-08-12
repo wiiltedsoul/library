@@ -1,6 +1,5 @@
 class Book:
-    # Add 'length_value=None' and 'length_unit=None' to the __init__ parameters
-    def __init__(self, title, author, rating=None, tropes=None, status=None, platform=None, length_value=None, length_unit=None):
+    def __init__(self, title, author, rating=None, tropes=None, status=None, platform=None, length_value=None, length_unit=None, dnf_reason=None):
         self.title = title
         self.author = author
         self.rating = rating
@@ -9,6 +8,7 @@ class Book:
         self.plat = platform
         self.length_value = length_value
         self.length_unit = length_unit
+        self.dnf_reason = dnf_reason
 
     def to_dict(self):
         """Converts the Book object into a dictionary suitable for JSON serialization."""
@@ -20,5 +20,6 @@ class Book:
             "status": self.status,
             "platform": self.plat,
             "length_value": self.length_value,
-            "length_unit": self.length_unit
+            "length_unit": self.length_unit,
+            "dnf_reason": self.dnf_reason
         }
