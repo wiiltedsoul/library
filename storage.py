@@ -182,25 +182,39 @@ def import_from_csv():
 
     imported_count = 0
     skipped_count = 0
-    # updated_count = 0 # Optional: To track if a book was updated instead of skipped/added (can add later if desired)
 
     try:
         with open(import_filename, mode='r', newline='', encoding='utf-8') as csvfile:
             reader = csv.DictReader(csvfile)
 
-            # Check for required headers
-            required_headers = ["Title", "Author", "My Rating", "Shelves", "My Review"]
+            # --- CORRECTED: Adjust required_headers to match YOUR CSV ---
+            required_headers = ["Title", "Author", "My Rating", "Exclusive Shelf", "Bookshelves", "My Review", "ISBN13"] # Added Bookshelves and ISBN13
+            # You can decide which ones are truly "required" for your basic import logic
+            
             if not all(header in reader.fieldnames for header in required_headers):
                 print(f"Error: Missing one or more required headers in '{import_filename}'. "
-                      f"Required: {', '.join(required_headers)}\n")
+                      f"Required: {', '.join(required_headers)}. Found: {', '.join(reader.fieldnames)}\n") # Added found headers for better debug
                 return
 
             for row in reader:
                 title = row.get("Title")
                 author = row.get("Author")
                 goodreads_rating_str = row.get("My Rating")
-                goodreads_shelves_str = row.get("Shelves") # Can contain multiple shelves, comma-separated
-                goodreads_review = row.get("My Review", "") # Default to empty string if no review
+                
+                # --- CORRECTED: Use "Exclusive Shelf" and "Bookshelves" ---
+                exclusive_shelf = row.get("Exclusive Shelf") 
+                goodreads_bookshelves_str = row.get("Bookshelves") # Use Bookshelves for custom shelves
+                
+                goodreads_review = row.get("My Review", "")
+                
+                # --- NEW: Get ISBN13 from the CSV ---
+                isbn13_from_csv = row.get("ISBN13") # New field from your CSV
+                isbn = None
+                if isbn13_from_csv:
+                    # Clean ISBN13 (remove quotes if present, sometimes CSVs wrap numbers in quotes)
+                    isbn = isbn13_from_csv.replace('="', '').replace('"', '').strip() # Common fix for Excel-exported ISBNs
+                    if not (len(isbn) == 13 and isbn.isdigit()): # Basic validation for ISBN13
+                        isbn = None # Invalidate if not a clean ISBN13
 
                 # Skip if essential data is missing
                 if not title or not author:
@@ -221,25 +235,25 @@ def import_from_csv():
                     rating = None # If conversion fails
 
                 # Status and DNF Reason mapping
-                status = "read" # Default status if no other specific shelf is found
+                status = "read" # Default status
                 dnf_reason = None
-                platform = None # Goodreads CSV doesn't have a direct field for this
-                length_value = None # Goodreads CSV doesn't have a direct field for this
-                length_unit = None # Goodreads CSV doesn't have a direct field for this
                 
-                shelves_list = [s.strip().lower() for s in goodreads_shelves_str.split(',')] if goodreads_shelves_str else []
-
-                if "to-read" in shelves_list or "currently-reading" in shelves_list:
+                # Use Exclusive Shelf for primary status
+                if exclusive_shelf and exclusive_shelf.strip().lower() == "to-read":
                     status = "tbr"
+                elif exclusive_shelf and exclusive_shelf.strip().lower() == "currently-reading":
+                    status = "tbr" # Map Goodreads 'currently-reading' to your 'tbr'
                 
-                # Check for DNF shelf and extract reason if present
-                if "did-not-finish" in shelves_list:
+                # Check custom bookshelves for 'did-not-finish'
+                custom_shelves_list = [s.strip().lower() for s in goodreads_bookshelves_str.split(',')] if goodreads_bookshelves_str else []
+                
+                if "did-not-finish" in custom_shelves_list: # Your custom DNF shelf
                     status = "dnf"
-                    # Try to extract DNF reason from review if it starts with "DNF Reason:"
                     if goodreads_review.strip().lower().startswith("dnf reason:"):
                         dnf_reason = goodreads_review.strip()[len("dnf reason:"):].strip()
                     else:
-                        dnf_reason = "No specific reason provided in Goodreads review." # Default DNF reason
+                        dnf_reason = "No specific reason provided in Goodreads review (via custom shelf)."
+
 
                 # If it's not explicitly 'to-read' or 'dnf' via shelves, it defaults to 'read'.
                 # We can refine this later if 'Date Read' is used for 'read' status.
@@ -255,13 +269,13 @@ def import_from_csv():
                         title=title,
                         author=author,
                         rating=rating,
-                        # Tropes are ignored as per your decision for import
-                        tropes=[], # Goodreads "Bookshelves" are often user-defined, so skipping for import simplicity
+                        tropes=[], # Ignored for import as per your decision
                         status=status,
-                        platform=platform, # Ignored for import
-                        length_value=length_value, # Ignored for import
-                        length_unit=length_unit, # Ignored for import
-                        dnf_reason=dnf_reason
+                        platform=None, # Ignored for import
+                        length_value=None, # Ignored for import
+                        length_unit=None, # Ignored for import
+                        dnf_reason=dnf_reason,
+                        isbn=isbn # <--- Pass the extracted ISBN
                     )
                     
                     # Add new book to respective list based on its status

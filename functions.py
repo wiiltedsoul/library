@@ -8,7 +8,7 @@ def add_new_book():
     book_author = input("Enter the book's author:\n") 
 
     if book_exists(book_title, book_author):
-        print(f"Error: '{book_title}' by {book_author} already exists in your library!\n")
+        print(f"Error: {book_title} by {book_author} already exists in your library!\n")
         return
     
     book_length = None
@@ -65,12 +65,32 @@ def add_new_book():
 
             if is_valid_isbn_format:
                 isbn_value = isbn_input_str # Store the raw input string (with or without hyphens)
-                print(f"ISBN '{isbn_input_str}' recorded.\n")
+                print(f"ISBN {isbn_input_str} recorded.\n")
                 break # Valid ISBN, exit loop
             else:
                 print("Invalid ISBN format. Please enter a 10-digit ISBN (with digits 0-9, 'X' for final check digit) or a 13-digit ISBN (all digits).\n")
-    # If isbn_choice is 'n' or anything else, isbn_value remains None.
     # --- END Corrected ISBN prompt and capture ---
+    
+    # --- NEW: Series Information Input ---
+    series_name_val = None
+    series_order_val = None
+
+    series_choice = input("Is this book part of a series? (Y/N)\n").lower()
+    if series_choice == "y":
+        series_name_val = input("What is the name of the series?\n").strip()
+        
+        while True: # Loop for series order validation
+            try:
+                order_input = input("What is its number in the series? (e.g., 1, 2.5)\n")
+                series_order_val = float(order_input)
+                if series_order_val > 0:
+                    break
+                else:
+                    print("Series order must be a positive number.\n")
+            except ValueError:
+                print("Invalid input. Please enter a number for series order.\n")
+    # If series_choice is 'n', series_name_val and series_order_val remain None.
+    # --- END NEW: Series Information Input ---
     
     # --- Start of refactored status input and attribute assignment ---
     book_rating = None
@@ -113,26 +133,33 @@ def add_new_book():
         platform=book_platform,
         length_value=book_length,
         length_unit=book_len_unit,
-        dnf_reason=dnf_reason, # Now dnf_reason is always defined
-        isbn=isbn_value # Pass the correctly obtained ISBN value (which is a string or None)
+        dnf_reason=dnf_reason,
+        isbn=isbn_value,
+        series_name=series_name_val,
+        series_order=series_order_val
     )
 
-
     # --- Refactored final appending logic ---
+
+    series_display = get_series_display_string(new_book) 
+
     if stat == "read":
         bookshelf.append(new_book)
-        print(f"'{book_title}' by {book_author} ({new_book.length_value} {new_book.length_unit}) has been added to your bookshelves with a rating of {new_book.rating} stars!\n")
+        # Embed the returned string directly into your f-string
+        print(f"{book_title} by {book_author}{series_display} ({int_length(new_book)} {new_book.length_unit}) has been added to your bookshelves with a rating of {new_book.rating} stars!\n")
     elif stat == "tbr":
         to_be_read.append(new_book)
-        print(f"'{book_title}' by {book_author} ({new_book.length_value} {new_book.length_unit}) has been added to your to-be-read shelf! Don't forget to read it on {new_book.platform}!\n")
+        # Embed the returned string directly into your f-string
+        print(f"{book_title} by {book_author}{series_display} ({int_length(new_book)} {new_book.length_unit}) has been added to your to-be-read shelf! Don't forget to read it on {new_book.platform}!\n")
     elif stat == "dnf":
         dnf_books.append(new_book)
-        print(f"'{book_title}' by {book_author} has been added to your DNF list because: {new_book.dnf_reason}!\n") # Added dnf_reason to print
+        # Embed the returned string directly into your f-string
+        print(f"{book_title} by {book_author}{series_display} has been added to your DNF list because: {new_book.dnf_reason}!\n")
     
     save_data()
 
-def generate_isbn_link(title=None, author=None, isbn=None): # Now takes direct strings/None
-    """Generates a https://isbnsearch.org URL for a given title, author, or ISBN."""
+def generate_isbn_link(title=None, author=None, isbn=None):
+    # Generates a https://isbnsearch.org URL for a given title, author, or ISBN
     base_url = "https://isbnsearch.org/search?s="
 
     if isbn:
@@ -150,6 +177,40 @@ def generate_isbn_link(title=None, author=None, isbn=None): # Now takes direct s
             return "No valid search terms (title or ISBN) available."
         return f"{base_url}{query}"
 
+def get_series_display_string(book_obj):
+    """
+    Generates a formatted string for a book's series information.
+    Returns an empty string if no series info is present.
+    """
+    series_info_str = ""
+    if book_obj.series_name and book_obj.series_order is not None:
+        # Determine the correct display format for series_order
+        if book_obj.series_order == int(book_obj.series_order):
+            # If the float value is equal to its integer conversion, display as integer
+            formatted_series_order = int(book_obj.series_order)
+        else:
+            # Otherwise, display as float
+            formatted_series_order = book_obj.series_order
+            
+        series_info_str = f" [{book_obj.series_name} #{formatted_series_order}]" # Use the formatted order
+    elif book_obj.series_name: # In case only series name is provided without an order
+        series_info_str = f" [{book_obj.series_name}]"
+    return series_info_str
+
+def int_length(book_obj):
+    """
+    Generates a formatted string for a book's length (pages/hours),
+    always displaying the value as an integer (truncating decimals).
+    Returns an empty string if no length info is present.
+    """
+    if book_obj.length_value is None or book_obj.length_unit is None:
+        return ""
+    
+    # Always convert to integer for display, truncating any decimal part
+    formatted_value = int(book_obj.length_value) 
+        
+    return f"{formatted_value} {book_obj.length_unit}"
+
 def view_bookshelf():
     if not bookshelf:
         print("\nYour Bookshelves are looking a bit dusty... Time to read some more!\n")
@@ -157,8 +218,9 @@ def view_bookshelf():
     
     print("\n--- Your Bookshelf ---")
     for book in bookshelf:
-        print(f"{book.title} by {book.author}")
-        print(f"{book.length_value}{book.length_unit}")
+        series_display = get_series_display_string(book) # Get series string
+        print(f"{book.title} by {book.author} {series_display}")
+        print(f"{int_length(book)}")
         if book.rating is not None:
             print(f"Rating: {book.rating} / 5")
         if book.tropes:
@@ -174,8 +236,9 @@ def view_tbr():
     
     print("\n--- Your TBR Shelf ---")
     for book in to_be_read:
-        print(f"{book.title} by {book.author}. [{book.platform}]")
-        print(f"{book.length_value}{book.length_unit}")
+        series_display = get_series_display_string(book) # Get series string
+        print(f"{book.title} by {book.author} {series_display}. [{book.platform}]")
+        print(f"{int_length(book)}")
         if book.tropes:
             print(f"Tropes: {', '.join(book.tropes)}")
         else:
@@ -189,8 +252,9 @@ def view_dnf():
     
     print("\n--- DNF Trashcan ---")
     for book in dnf_books:
-        print(f"{book.title} by {book.author}")
-        print(f"{book.length_value}{book.length_unit}")
+        series_display = get_series_display_string(book) # Get series string
+        print(f"{book.title} by {book.author} {series_display}")
+        print(f"{int_length(book)}")
         if book.tropes:
             print(f"Tropes: {', '.join(book.tropes)}")
         else:
@@ -261,7 +325,7 @@ def update_book():
 
     # change shelf
     elif update_choice == '5':
-        print(f"Current status of '{book_to_update.title}': {book_to_update.status}")
+        print(f"Current status of {book_to_update.title}: {book_to_update.status}")
         
         new_status_input = None
         while True:
@@ -273,7 +337,7 @@ def update_book():
         
         # If the new status is the same as the current status, do nothing
         if new_status_input == book_to_update.status:
-            print(f"'{book_to_update.title}' is already marked as '{new_status_input}'. No change made.\n")
+            print(f"{book_to_update.title} is already marked as {new_status_input}. No change made.\n")
             save_data() # Save just in case (though no change, good for consistency)
             return
 
@@ -294,14 +358,14 @@ def update_book():
                 else:
                     book_to_update.platform = None # Clear platform if not provided
                 book_to_update.dnf_reason = None # Clear DNF reason
-                print(f"'{book_to_update.title}' moved to To Be Read shelf.\n")
+                print(f"{book_to_update.title} moved to To Be Read shelf.\n")
             elif new_status_input == "dnf":
                 dnf_books.append(book_to_update)
                 book_to_update.status = "dnf"
                 book_to_update.rating = None
                 book_to_update.platform = None
                 book_to_update.dnf_reason = input("Why did you DNF this book?\n")
-                print(f"'{book_to_update.title}' moved to DNF list.\n")
+                print(f"{book_to_update.title} moved to DNF list.\n")
 
         # Scenario B: Book is currently TBR
         elif book_to_update.status == "tbr":
@@ -324,14 +388,14 @@ def update_book():
                     except ValueError:
                         print("Invalid input. Please enter a number.\n")
                 book_to_update.dnf_reason = None # Clear DNF reason
-                print(f"'{book_to_update.title}' moved to Bookshelf.\n")
+                print(f"{book_to_update.title} moved to Bookshelf.\n")
             elif new_status_input == "dnf":
                 dnf_books.append(book_to_update)
                 book_to_update.status = "dnf"
                 book_to_update.rating = None
                 book_to_update.platform = None # Clear platform from TBR
                 book_to_update.dnf_reason = input("Why did you DNF this book?\n")
-                print(f"'{book_to_update.title}' moved to DNF list.\n")
+                print(f"{book_to_update.title} moved to DNF list.\n")
         
         # Scenario C: Book is currently DNF
         elif book_to_update.status == "dnf":
@@ -354,7 +418,7 @@ def update_book():
                             print("Please enter a rating between 1 and 5.\n")
                     except ValueError:
                         print("Invalid input. Please enter a number.\n")
-                print(f"'{book_to_update.title}' moved to Bookshelf.\n")
+                print(f"{book_to_update.title} moved to Bookshelf.\n")
             elif new_status_input == "tbr":
                 to_be_read.append(book_to_update)
                 book_to_update.status = "tbr"
@@ -366,7 +430,7 @@ def update_book():
                     book_to_update.platform = input("Where can you read this book?\n")
                 else:
                     book_to_update.platform = None # Clear platform if not provided
-                print(f"'{book_to_update.title}' moved to To Be Read shelf.\n")
+                print(f"{book_to_update.title} moved to To Be Read shelf.\n")
         
         save_data() # Save data after the transition is complete
 
@@ -375,7 +439,7 @@ def update_book():
         if book_to_update in to_be_read:
             new_platform = input("Okay, what's the new plaform?\n")
             book_to_update.platform = new_platform
-            print(f"{book_to_update.title}'s new platform is {book_to_update.platform}.")
+            print(f"{book_to_update.title}s new platform is {book_to_update.platform}.")
         else:
             print("Sorry this is only for books you haven't read yet!")
         save_data()
@@ -386,7 +450,6 @@ def update_book():
         return
     else:
         print("Invalid choice! Please enter a number between 1 and 7.")
-    
 
 def find_book_update():
 # Prompts user for book details and returns the Book object if found, else None
@@ -399,7 +462,7 @@ def find_book_update():
         if book.title.lower() == search_title.lower() and \
            book.author.lower() == search_author.lower():
             found_book = book
-            print(f"DEBUG: Found '{book.title}' in bookshelf.")
+            print(f"DEBUG: Found {book.title} in bookshelf.")
             return found_book # Return the actual book object and exit
 
     # Search in to_be_read
@@ -407,10 +470,10 @@ def find_book_update():
         if book.title.lower() == search_title.lower() and \
            book.author.lower() == search_author.lower():
             found_book = book
-            print(f"DEBUG: Found '{book.title}' in to-be-read shelf.")
+            print(f"DEBUG: Found {book.title} in to-be-read shelf.")
             return found_book # Return the actual book object and exit
 
-    print(f"Book '{search_title}' by {search_author}' not found in your library, maybe double check spelling?")
+    print(f"Book {search_title} by {search_author} not found in your library, maybe double check spelling?")
     return None # If we get here, no book was found
 
 def searching():
@@ -433,8 +496,9 @@ def searching():
         if search_results_book:
             print("\n--- Search Results ---")
             for book in search_results_book: # This loop processes EACH found book
-                print(f"{book.title} by {book.author}")
-                print(f"{book.length_value}{book.length_unit}")
+                series_display = get_series_display_string(book) # Get series string
+                print(f"{book.title} by {book.author} {series_display}")
+                print(f"{int_length(book)}")
                 
                 if book.status == "read":
                     if book.rating is not None:
@@ -464,13 +528,14 @@ def searching():
                     break # Found the trope in this book, move to the next book
 
         # --- Display results for the 'trope' search, OUTSIDE both loops ---
-        print(f"Found {len(matching_books_trope)} matching books with the trope '{find_trope_query}'.")
+        print(f"Found {len(matching_books_trope)} matching books with the trope {find_trope_query}.")
         
         if matching_books_trope: # This condition now correctly uses 'matching_books_trope'
             print("\n--- Search Results ---")
             for book in matching_books_trope: # This loop processes EACH found book for trope
-                print(f"{book.title} by {book.author}")
-                print(f"{book.length_value}{book.length_unit}")
+                series_display = get_series_display_string(book) # Get series string
+                print(f"{book.title} by {book.author} {series_display}")
+                print(f"{int_length(book)}")
                 
                 if book.status == "read":
                     if book.rating is not None:
@@ -495,21 +560,21 @@ def delete():
 
     if book_to_delete is None: # If the book wasn't found by the helper, just exit
         return
-
-    delete_confirm = input(f"Is '{book_to_delete.title}' by {book_to_delete.author} the book you're trying to delete? (Y/N)\n").lower() # Fixed f-string and added newline
+    series_display = get_series_display_string(book_to_delete) # Get series string
+    delete_confirm = input(f"Is {book_to_delete.title} by {book_to_delete.author} {series_display} the book you're trying to delete? (Y/N)\n").lower() # Fixed f-string and added newline
 
     if delete_confirm == "y":
         # Check which list it's in and remove it
         if book_to_delete in bookshelf:
             bookshelf.remove(book_to_delete)
-            print(f"Awh, sad to see '{book_to_delete.title}' go! It has been removed from your bookshelf.\n")
+            print(f"Awh, sad to see {book_to_delete.title} go! It has been removed from your bookshelf.\n")
         elif book_to_delete in to_be_read: # Use elif to ensure only one list is checked if it's found in the first
             to_be_read.remove(book_to_delete)
-            print(f"Awh, sad to see '{book_to_delete.title}' go! It has been removed from your to-be-read shelf.\n")
+            print(f"Awh, sad to see {book_to_delete.title} go! It has been removed from your to-be-read shelf.\n")
         else:
             # This 'else' should theoretically not be hit if find_book_for_update works,
             # but it's good for robustness.
-            print(f"Error: '{book_to_delete.title}' not found in either list, despite initial search.")
+            print(f"Error: {book_to_delete.title} not found in either list, despite initial search.")
             return # Exit if somehow not found
 
         save_data() # Save ONLY if a deletion actually occurred and was confirmed
@@ -534,8 +599,6 @@ def sorting_menu():
     print("4. By Page No.")
     print("5. Return to main menu")
     print("--------------------------")
-
-# (Your filter_menu() and sorting_menu() functions would be here in functions.py)
 
 def filter_and_sort_books():
     # Allows the user to filter or sort their library.
@@ -576,8 +639,9 @@ def filter_and_sort_books():
                 # --- Display the collected filtered books ---
                 if filtered_books:
                     for book in filtered_books:
-                        print(f"{book.title} by {book.author}")
-                        print(f"{book.length_value}{book.length_unit}")
+                        series_display = get_series_display_string(book) # Get series string
+                        print(f"{book.title} by {book.author} {series_display}")
+                        print(f"{int_length(book)}")
                         if book.status == "read": # Display rating only for read books
                             if book.rating is not None:
                                 print(f"Rating: {book.rating} / 5")
@@ -612,8 +676,9 @@ def filter_and_sort_books():
                 
                 if filtered_books:
                     for book in filtered_books:
-                        print(f"{book.title} by {book.author}.")
-                        print(f"{book.length_value}{book.length_unit}")
+                        series_display = get_series_display_string(book) # Get series string
+                        print(f"{book.title} by {book.author} {series_display}.")
+                        print(f"{int_length(book)}")
                         print(f"Rating: {book.rating} / 5")
                         if book.tropes:
                             print(f"Tropes: {', '.join(book.tropes)}")
@@ -623,7 +688,7 @@ def filter_and_sort_books():
                 else:
                     print("No books found matching this rating criteria.\n")
 
-            elif main_choice == '3': 
+            elif filter_choice == '3': 
                 print("You chose to filter by Platform!")
                 platform_query = input("What platform are you looking for?\nPhysical, Kindle, Kobo, Audible, Google or BookFunnel").lower()
                 filtered_books = [] # This list will hold books matching the platform
@@ -632,8 +697,9 @@ def filter_and_sort_books():
                         filtered_books.append(book)
                 if filtered_books:
                     for book in filtered_books:
-                        print(f"{book.title} by {book.author}. [{book.platform}]")
-                        print(f"{book.length_value}{book.length_unit}")
+                        series_display = get_series_display_string(book) # Get series string
+                        print(f"{book.title} by {book.author} {series_display}. [{book.platform}]")
+                        print(f"{int_length(book)}")
                         if book.tropes:
                             print(f"Tropes: {', '.join(book.tropes)}")
                         else:
@@ -653,12 +719,13 @@ def filter_and_sort_books():
                         if trope_item.lower() == trope_query:
                             filtered_books.append(book)
                             break # Found the trope in this book, move to the next book
-                print(f"\n--- Found {len(filtered_books)} matching books with the trope '{trope_query}' ---") # Added newlines for better spacing
+                print(f"\n--- Found {len(filtered_books)} matching books with the trope {trope_query} ---") # Added newlines for better spacing
                     
                 if filtered_books:
                     print("\n--- Search Results ---") # Added newline for consistency
                     for book in filtered_books:
-                        print(f"{book.title} by {book.author}.")
+                        series_display = get_series_display_string(book) # Get series string
+                        print(f"{book.title} by {book.author} {series_display}.")
                         if book.status == "read":
                             if book.rating is not None:
                                 print(f"Rating: {book.rating} / 5")
@@ -692,8 +759,9 @@ def filter_and_sort_books():
                 if sorted_books:
                     print("\n--- Sorted by Title (A-Z) ---")
                     for book in sorted_books:
-                        print(f"{book.title} by {book.author}")
-                        print(f"{book.length_value}{book.length_unit}")
+                        series_display = get_series_display_string(book) # Get series string
+                        print(f"{book.title} by {book.author} {series_display}")
+                        print(f"{int_length(book)}")
                         
                         if book.status == "read":
                             if book.rating is not None:
@@ -719,8 +787,9 @@ def filter_and_sort_books():
                 if sorted_books:
                     print("\n--- Sorted by Author (A-Z) ---")
                     for book in sorted_books:
-                        print(f"{book.title} by {book.author}")
-                        print(f"{book.length_value}{book.length_unit}")
+                        series_display = get_series_display_string(book) # Get series string
+                        print(f"{book.title} by {book.author} {series_display}")
+                        print(f"{int_length(book)}")
                         
                         if book.status == "read":
                             if book.rating is not None:
@@ -750,8 +819,9 @@ def filter_and_sort_books():
                 if sorted_by_rating:
                     print("\n--- Sorted by Rating (Highest to Lowest) ---")
                     for book in sorted_by_rating:
-                        print(f"{book.title} by {book.author}")
-                        print(f"{book.length_value}{book.length_unit}")
+                        series_display = get_series_display_string(book) # Get series string
+                        print(f"{book.title} by {book.author} {series_display}")
+                        print(f"{int_length(book)}")
                         print(f"Rating: {book.rating} / 5")
                         if book.tropes:
                             print(f"Tropes: {', '.join(book.tropes)}")
@@ -773,8 +843,9 @@ def filter_and_sort_books():
                 if sorted_by_length:
                     print("\n--- Sorted by Length (Shortest to Longest) ---")
                     for book in sorted_by_length:
-                        print(f"{book.title} by {book.author}")
-                        print(f"{book.length_value}{book.length_unit}")
+                        series_display = get_series_display_string(book) # Get series string
+                        print(f"{book.title} by {book.author} {series_display}")
+                        print(f"{int_length(book)}")
                         if book.status == "read":
                             if book.rating is not None:
                                 print(f"Rating: {book.rating} / 5")

@@ -2,3 +2,4 @@ __pycache__
 bookshelf.json
 tbr.json
 dnf.json
+import.csv
