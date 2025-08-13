@@ -1,4 +1,5 @@
 from book import Book
+import urllib.parse
 from data import bookshelf, to_be_read, dnf_books
 from storage import save_data
 
@@ -14,7 +15,7 @@ def book_exists(title, author):
 
 def add_new_book():
     book_title = input("Enter the book's title:\n")
-    book_author = input("Enter the book's author:\n")
+    book_author = input("Enter the book's author:\n") 
 
     if book_exists(book_title, book_author):
         print(f"Error: '{book_title}' by {book_author} already exists in your library!\n")
@@ -43,6 +44,43 @@ def add_new_book():
 
     book_tropes_string = input("What are the tropes? (each new trope separated by '|' with no spaces)\n")
     book_tropes_list = [trope.strip() for trope in book_tropes_string.split('|') if trope.strip()]
+
+    # --- Corrected ISBN prompt and capture block ---
+    isbn_value = None # Initialize to None; will be assigned if user provides ISBN
+
+    print("To more easily track items in your shelves and to more seamlessly export/import\n")
+    print("it's recommended to add an ISBN - we use isbnsearch.org.")
+    
+    # Generate link using already collected title and author
+    search_link_for_isbn = generate_isbn_link(title=book_title, author=book_author)
+    print(f"We've pre-filled a search for you: {search_link_for_isbn}\n") # Display the link here!
+
+    isbn_choice = input("Have you found the ISBN and are you ready to enter it? (Y/N)\n").lower()
+    if isbn_choice == "y":
+        while True: # Loop for ISBN input validation
+            isbn_input_str = input("What is the book's ISBN (10 or 13 digits, hyphens optional)?\n").strip() # Get as string, strip whitespace
+            
+            cleaned_isbn = isbn_input_str.replace('-', '').upper() # Remove hyphens, convert to uppercase for 'X' check
+            
+            is_valid_isbn_format = False
+            
+            if len(cleaned_isbn) == 10:
+                # ISBN-10: first 9 chars must be digits, last char must be digit or 'X'
+                if cleaned_isbn[:-1].isdigit() and (cleaned_isbn[-1].isdigit() or cleaned_isbn[-1] == 'X'):
+                    is_valid_isbn_format = True
+            elif len(cleaned_isbn) == 13:
+                # ISBN-13: all 13 chars must be digits
+                if cleaned_isbn.isdigit():
+                    is_valid_isbn_format = True
+
+            if is_valid_isbn_format:
+                isbn_value = isbn_input_str # Store the raw input string (with or without hyphens)
+                print(f"ISBN '{isbn_input_str}' recorded.\n")
+                break # Valid ISBN, exit loop
+            else:
+                print("Invalid ISBN format. Please enter a 10-digit ISBN (with digits 0-9, 'X' for final check digit) or a 13-digit ISBN (all digits).\n")
+    # If isbn_choice is 'n' or anything else, isbn_value remains None.
+    # --- END Corrected ISBN prompt and capture ---
     
     # --- Start of refactored status input and attribute assignment ---
     book_rating = None
@@ -85,8 +123,10 @@ def add_new_book():
         platform=book_platform,
         length_value=book_length,
         length_unit=book_len_unit,
-        dnf_reason=dnf_reason # Now dnf_reason is always defined
+        dnf_reason=dnf_reason, # Now dnf_reason is always defined
+        isbn=isbn_value # Pass the correctly obtained ISBN value (which is a string or None)
     )
+
 
     # --- Refactored final appending logic ---
     if stat == "read":
@@ -100,6 +140,25 @@ def add_new_book():
         print(f"'{book_title}' by {book_author} has been added to your DNF list because: {new_book.dnf_reason}!\n") # Added dnf_reason to print
     
     save_data()
+
+def generate_isbn_link(title=None, author=None, isbn=None): # Now takes direct strings/None
+    """Generates a https://isbnsearch.org URL for a given title, author, or ISBN."""
+    base_url = "https://isbnsearch.org/search?s="
+
+    if isbn:
+        query = urllib.parse.quote_plus(isbn)
+        return f"{base_url}{query}"
+    else:
+        title_encoded = urllib.parse.quote_plus(title or "")
+        author_encoded = urllib.parse.quote_plus(author or "")
+        
+        if title_encoded and author_encoded:
+            query = f"{title_encoded}+{author_encoded}"
+        elif title_encoded: # Just title if no author
+            query = title_encoded
+        else:
+            return "No valid search terms (title or ISBN) available."
+        return f"{base_url}{query}"
 
 def view_bookshelf():
     if not bookshelf:
