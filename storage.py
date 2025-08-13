@@ -3,7 +3,6 @@ import json
 import csv
 
 from book import Book
-from functions import book_exists
 from data import bookshelf, to_be_read, dnf_books 
 
 BOOKSHELF_FILE = "bookshelf.json"
@@ -77,6 +76,16 @@ def load_data():
         print(f"DEBUG: Error reading {DNF_FILE}. File might be corrupted.")
 
     print("DEBUG: Data loading complete.")
+
+def book_exists(title, author):
+    # Checks if a book with the given title and author already exists in either list
+    for book in bookshelf:
+        if book.title.lower() == title.lower() and book.author.lower() == author.lower():
+            return True
+    for book in to_be_read:
+        if book.title.lower() == title.lower() and book.author.lower() == author.lower():
+            return True
+    return False
 
 def export_to_json():
     """Exports all books from the library to a single JSON file."""

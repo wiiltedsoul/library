@@ -1,17 +1,7 @@
 from book import Book
 import urllib.parse
+from storage import save_data, load_data, book_exists
 from data import bookshelf, to_be_read, dnf_books
-from storage import save_data
-
-def book_exists(title, author):
-    # Checks if a book with the given title and author already exists in either list
-    for book in bookshelf:
-        if book.title.lower() == title.lower() and book.author.lower() == author.lower():
-            return True
-    for book in to_be_read:
-        if book.title.lower() == title.lower() and book.author.lower() == author.lower():
-            return True
-    return False
 
 def add_new_book():
     book_title = input("Enter the book's title:\n")
